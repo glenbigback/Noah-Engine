@@ -1,0 +1,1302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gang VR Engine</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/examples/js/loaders/OBJLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/examples/js/loaders/STLLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/examples/js/libs/fflate.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/examples/js/loaders/FBXLoader.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style type="text/tailwindcss">@theme{--color-zinc-950:#1b2028;--color-zinc-900:#242a33;--color-zinc-800:#2f3743;--color-indigo-500:#478cbf;--color-indigo-400:#6aa6d4}</style>
+<style>
+  html,body{height:100%;margin:0;background:#1d2229;overscroll-behavior:none}
+  body{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box;font-family:ui-sans-serif,system-ui,sans-serif}
+  input[type=number],input[type=text],textarea{background:#303846;border:1px solid rgba(255,255,255,.1);border-radius:.5rem;padding:.3rem .45rem;width:100%;color:#fafafa;font-size:.8rem;outline:none}
+  textarea{font-family:ui-monospace,Menlo,monospace;white-space:pre;overflow:auto}
+  input:focus,textarea:focus{border-color:#478cbf}
+  input[type=color]{width:100%;height:2rem;background:#303846;border:1px solid rgba(255,255,255,.1);border-radius:.5rem;padding:2px}
+  .panel{display:none}
+  @media(max-width:1023px){#app[data-tab=scene] #scenePanel,#app[data-tab=hier] #hierPanel,#app[data-tab=insp] #inspPanel{display:flex}}
+  @media(min-width:1024px){.panel{display:flex!important}}
+  .tab-on{background:#478cbf;color:#fff}
+</style>
+
+<style id="noah-mobile-layout-fix">
+  html, body { width:100%; height:100%; min-height:100%; }
+  #app { height:100dvh; min-height:0; display:flex; flex-direction:column; }
+  #app > header { flex:0 0 auto; min-height:48px; flex-wrap:wrap; }
+  #app > main { flex:1 1 auto; min-height:0; overflow:hidden; }
+  #app > nav { flex:0 0 auto; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:4px; padding:6px; padding-bottom:calc(6px + env(safe-area-inset-bottom,0px)); }
+  #app > nav button { min-height:42px; color:#fff; background:#242a33; border:1px solid rgba(255,255,255,.12); border-radius:9px; }
+  #app > nav button.tab-on { background:#478cbf; }
+  #hierPanel, #scenePanel, #inspPanel { min-width:0; min-height:0; }
+  #list, #files { min-height:80px; }
+  #insp { padding-bottom:24px; }
+  #btnExport { min-width:40px; min-height:38px; display:grid; place-items:center; }
+  #exportModal { position:fixed; inset:0; z-index:100; display:none; align-items:center; justify-content:center; padding:14px; background:rgba(0,0,0,.78); }
+  #exportModal.open { display:flex; }
+  #exportModal .export-card { width:min(720px,100%); max-height:90dvh; overflow:auto; background:#202630; color:#fff; border:1px solid #46505e; border-radius:18px; padding:16px; box-shadow:0 20px 70px #0009; }
+  #exportModal .export-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+  #exportModal .target { text-align:left; min-height:76px; border:1px solid #485260; background:#2a323e; border-radius:12px; padding:10px; color:#fff; }
+  #exportModal .target.active { border-color:#7db9f0; background:#263f56; box-shadow:inset 0 0 0 1px #7db9f0; }
+  #exportModal .target small { display:block; color:#c3ccd7; margin-top:4px; line-height:1.3; }
+  #exportModal .export-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+  #exportModal button.action { border:1px solid #596575; border-radius:9px; padding:9px 12px; color:white; background:#303a48; }
+  #exportModal button.primary { background:#478cbf; border-color:#478cbf; color:#fff; }
+  #projectTools { display:flex; flex-wrap:wrap; gap:6px; padding:8px 10px; border-bottom:1px solid rgba(255,255,255,.1); }
+  #projectTools button { font-size:12px; border:1px solid #485260; background:#2a323e; color:white; border-radius:8px; padding:6px 8px; }
+  @media (min-width:1024px) {
+    #app > nav { display:none; }
+    #app > main { display:grid; grid-template-columns:minmax(210px,250px) minmax(0,1fr) minmax(250px,290px); }
+    #hierPanel, #scenePanel, #inspPanel { display:flex !important; }
+  }
+  @media (max-width:1023px) {
+    #app > main { display:flex; }
+    #app[data-tab="hier"] #hierPanel { display:flex !important; }
+    #app[data-tab="scene"] #scenePanel { display:flex !important; }
+    #app[data-tab="insp"] #inspPanel { display:flex !important; }
+    #app[data-tab="hier"] #scenePanel, #app[data-tab="hier"] #inspPanel,
+    #app[data-tab="scene"] #hierPanel, #app[data-tab="scene"] #inspPanel,
+    #app[data-tab="insp"] #hierPanel, #app[data-tab="insp"] #scenePanel { display:none !important; }
+    #app > main > .panel { flex:1 1 100%; width:100%; border-left:0; border-right:0; }
+    #exportModal .export-grid { grid-template-columns:1fr; }
+  }
+</style>
+
+</head>
+<body class="text-zinc-100">
+<div id="app" data-tab="scene" class="h-full flex flex-col">
+
+  <header class="flex items-center gap-2 px-3 py-2 border-b border-white/10 bg-zinc-900">
+    <div class="flex items-center gap-2 mr-auto min-w-0">
+      <div class="w-7 h-7 shrink-0 rounded-lg bg-indigo-500 grid place-items-center">
+        <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h18v8a2 2 0 01-2 2h-3.5l-2-3h-3l-2 3H5a2 2 0 01-2-2z"/></svg>
+      </div>
+      <span class="font-semibold text-sm tracking-tight truncate">Gang <span class="text-indigo-400">VR</span> Engine</span>
+    </div>
+    <button id="btnZip" class="flex items-center gap-1.5 rounded-lg border border-white/10 hover:bg-white/5 text-sm px-2.5 py-1.5 transition">
+      <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M7 8l5-5 5 5M5 21h14"/></svg><span class="hidden sm:inline">Import</span>
+    </button>
+    <button id="btnPlay" class="flex items-center gap-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-sm font-medium px-2.5 py-1.5 transition">
+      <svg id="icoPlay" viewBox="0 0 24 24" class="w-4 h-4" fill="currentColor"><path d="M7 4l13 8-13 8z"/></svg>
+      <svg id="icoStop" viewBox="0 0 24 24" class="w-4 h-4 hidden" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
+      <span id="lblPlay" class="hidden sm:inline">Run</span>
+    </button>
+    <button id="btnVR" class="flex items-center gap-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-400 text-white text-sm font-medium px-2.5 py-1.5 transition">
+      <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h18v8a2 2 0 01-2 2h-3.5l-2-3h-3l-2 3H5a2 2 0 01-2-2z"/></svg>Enter VR
+    </button>
+    <button id="btnExport" title="Export zip" class="rounded-lg border border-white/10 hover:bg-white/5 p-2 transition">
+      <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
+    </button>
+    <button id="btnUser" class="rounded-lg border border-white/10 hover:bg-white/5 text-sm px-2.5 py-1.5 transition truncate" style="max-width:120px">Sign in</button>
+    <input id="zipIn" type="file" class="hidden">
+  </header>
+
+  <main class="flex-1 min-h-0 flex lg:grid lg:grid-cols-[250px_1fr_290px]">
+
+    <aside id="hierPanel" class="panel flex-col flex-1 min-h-0 border-r border-white/10 bg-zinc-900">
+      <div class="flex items-center justify-between px-3 py-2 border-b border-white/10">
+        <span class="text-xs uppercase tracking-wider text-zinc-400">Project</span>
+        <div class="relative">
+          <button id="btnAdd" class="flex items-center gap-1 rounded-lg bg-indigo-500 hover:bg-indigo-400 text-white text-xs font-medium px-2.5 py-1.5 transition">
+            <svg viewBox="0 0 24 24" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add
+          </button>
+          <div id="menuAdd" class="hidden absolute right-0 mt-1 w-56 rounded-xl border border-white/10 bg-zinc-800 shadow-xl p-1 z-20 text-sm">
+            <button data-add="cube" class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/5">MeshInstance3D (Box)</button>
+            <button data-add="sphere" class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/5">RigidBody3D (Ball)</button>
+            <button data-add="cylinder" class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/5">MeshInstance3D (Cylinder)</button>
+            <button data-add="ground" class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/5">StaticBody3D (Floor)</button>
+            <button data-add="spawn" class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/5">XROrigin3D</button>
+          </div>
+        </div>
+      </div>
+      <div id="projectTools">
+        <button id="newProjectBtn" type="button">New project</button>
+        <button id="renameProjectBtn" type="button">Rename</button>
+        <button id="saveProjectBtn" type="button">Save project</button>
+        <button id="myProjectsBtn" type="button">My Projects</button>
+      </div>
+      <div class="grid grid-cols-2 gap-1 p-1 m-3 mb-1 rounded-xl bg-zinc-800 text-xs font-medium">
+        <button data-seg="scene" class="rounded-lg py-1.5 tab-on">Scene</button>
+        <button data-seg="files" class="rounded-lg py-1.5">FileSystem</button>
+      </div>
+      <input id="search" type="text" placeholder="Search..." class="!w-auto m-3 mb-1">
+      <ul id="list" class="flex-1 overflow-auto p-2 space-y-1"></ul>
+      <ul id="files" class="flex-1 overflow-auto p-2 space-y-1" style="display:none"></ul>
+    </aside>
+
+    <section id="scenePanel" class="panel flex-col flex-1 min-w-0 min-h-0 bg-zinc-950">
+      <div class="flex items-center gap-2 px-3 py-2 text-xs text-zinc-400 border-b border-white/10 bg-zinc-900/60">
+        <span id="modeLbl" class="uppercase tracking-wider">Scene</span>
+        <span class="ml-auto hidden sm:inline">Drag: orbit · Right-drag: pan · Wheel/pinch: zoom · Drag object: move</span>
+        <button id="zOut" class="ml-auto sm:ml-0 rounded-lg border border-white/10 px-2 py-1 hover:bg-white/5">−</button>
+        <button id="zIn" class="rounded-lg border border-white/10 px-2 py-1 hover:bg-white/5">+</button>
+      </div>
+      <div id="wrap" class="flex-1 min-h-0 relative overflow-hidden">
+      </div>
+      <div class="border-t border-white/10 bg-zinc-900">
+        <div class="flex items-center justify-between px-3 py-1 text-[11px] uppercase tracking-wider text-zinc-400"><span>Output</span><button id="outClr" class="hover:text-white">Clear</button></div>
+        <div id="outList" class="h-20 overflow-auto px-3 pb-2 text-[11px] font-mono"></div>
+      </div>
+    </section>
+
+    <aside id="inspPanel" class="panel flex-col flex-1 min-h-0 border-l border-white/10 bg-zinc-900 overflow-auto">
+      <div class="px-3 py-2 border-b border-white/10"><span class="text-xs uppercase tracking-wider text-zinc-400">Inspector</span></div>
+      <div id="insp" class="p-3 space-y-4 text-sm"></div>
+    </aside>
+  </main>
+
+  <nav class="lg:hidden grid grid-cols-3 gap-1 p-1.5 border-t border-white/10 bg-zinc-900 text-xs font-medium">
+    <button data-tab="hier" class="rounded-lg py-2">Project</button>
+    <button data-tab="scene" class="rounded-lg py-2 tab-on">Scene</button>
+    <button data-tab="insp" class="rounded-lg py-2">Inspector</button>
+  </nav>
+</div>
+
+<div id="toast" class="fixed bottom-16 lg:bottom-6 inset-x-4 mx-auto max-w-sm rounded-xl bg-zinc-800 border border-white/10 px-4 py-2.5 text-sm text-center shadow-xl pointer-events-none z-[60] transition-opacity" style="opacity:0"></div>
+<!-- Code editor modal -->
+<div id="ed" style="display:none" class="fixed inset-0 z-50 bg-black/70 items-center justify-center p-3">
+  <div class="w-full max-w-3xl rounded-2xl border border-white/10 bg-zinc-900 p-4 space-y-3 shadow-2xl">
+    <div class="flex items-center gap-2">
+      <span id="edName" class="flex-1 truncate text-sm font-medium"></span>
+      <button id="edSave" class="rounded-lg bg-indigo-500 hover:bg-indigo-400 text-white text-sm font-medium px-3 py-1.5 transition">Save</button>
+      <button id="edClose" class="rounded-lg border border-white/10 hover:bg-white/5 text-sm px-3 py-1.5 transition">Close</button>
+    </div>
+    <textarea id="edText" wrap="off" spellcheck="false" autocapitalize="off" autocomplete="off" style="height:60vh"></textarea>
+  </div>
+</div>
+
+
+<!-- Sign in / create account -->
+<div id="authModal" style="position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;padding:16px;background:#1b2028">
+  <div style="width:min(380px,100%);background:#242a33;border:1px solid #46505e;border-radius:18px;padding:20px;color:#fff;box-shadow:0 20px 70px #0009">
+    <h2 id="authTitle" style="font-size:20px;font-weight:700;margin:0 0 4px">Sign in</h2>
+    <p style="font-size:12px;color:#c3ccd7;margin:0 0 14px;line-height:1.4">Sign in so your project saves automatically. Accounts are stored in this browser on this device only.</p>
+    <input id="authUser" type="text" placeholder="Username" autocomplete="username" autocapitalize="off" spellcheck="false" style="margin-bottom:8px">
+    <input id="authPass" type="password" placeholder="Password" autocomplete="current-password" style="width:100%;background:#303846;border:1px solid rgba(255,255,255,.1);border-radius:.5rem;padding:.3rem .45rem;color:#fafafa;font-size:.8rem;outline:none">
+    <p id="authErr" style="color:#fb7185;font-size:12px;min-height:16px;margin:8px 0 0"></p>
+    <button id="authSubmit" type="button" style="width:100%;margin-top:6px;border-radius:10px;padding:10px;background:#478cbf;color:#fff;font-weight:600">Sign in</button>
+    <button id="authSwitch" type="button" style="width:100%;margin-top:8px;border:1px solid #596575;border-radius:10px;padding:9px;background:#303a48;color:#fff;font-size:13px">Create an account</button>
+    <button id="authGuest" type="button" style="width:100%;margin-top:8px;padding:8px;color:#c3ccd7;font-size:12px;text-decoration:underline">Continue as guest</button>
+  </div>
+</div>
+
+<!-- My Projects -->
+<div id="projModal" style="position:fixed;inset:0;z-index:120;display:none;align-items:center;justify-content:center;padding:14px;background:rgba(0,0,0,.78)">
+  <div style="width:min(520px,100%);max-height:90dvh;overflow:auto;background:#202630;color:#fff;border:1px solid #46505e;border-radius:18px;padding:16px">
+    <h3 style="font-size:18px;font-weight:700;margin:0 0 6px">My Projects</h3>
+    <p style="font-size:12px;color:#c3ccd7;line-height:1.45;margin:0 0 10px">Every project you make is saved here automatically on this device. Download them all in one file called projects.json, and load that file later to bring them all back.</p>
+    <ul id="projList" style="list-style:none;margin:0 0 10px;padding:0;display:flex;flex-direction:column;gap:6px"></ul>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      <button id="projExport" type="button" style="border-radius:9px;padding:8px 12px;background:#478cbf;color:#fff">Download projects file</button>
+      <button id="projImport" type="button" style="border:1px solid #596575;border-radius:9px;padding:8px 12px;background:#303a48;color:#fff">Load projects file</button>
+      <button id="projClose" type="button" style="border:1px solid #596575;border-radius:9px;padding:8px 12px;background:#303a48;color:#fff">Close</button>
+    </div>
+    <input id="projFileIn" type="file" class="hidden" accept=".json,.txt,application/json,text/plain">
+    <div id="projNote" style="display:none;font-size:13px;line-height:1.5;color:#d5dce5;background:#171c23;border-radius:10px;padding:10px;margin-top:12px"></div>
+  </div>
+</div>
+
+<!-- Downloads blocked help -->
+<div id="dlHelp" style="position:fixed;inset:0;z-index:150;display:none;align-items:center;justify-content:center;padding:14px;background:rgba(0,0,0,.78)">
+  <div style="width:min(460px,100%);max-height:90dvh;overflow:auto;background:#202630;color:#fff;border:1px solid #46505e;border-radius:18px;padding:16px">
+    <h3 style="font-size:18px;font-weight:700;margin:0 0 8px">Turn on downloads</h3>
+    <p style="font-size:13px;color:#d5dce5;line-height:1.5;margin:0 0 8px">Your browser or app is blocking the download. To fix it:</p>
+    <ol style="font-size:13px;color:#d5dce5;line-height:1.55;margin:0 0 10px;padding-left:18px">
+      <li>In Chrome: tap ⋮ → Settings → Site settings → Automatic downloads → Allow.</li>
+      <li>On Android: Settings → Apps → your browser (or this app) → Permissions → allow Files / Storage and Notifications.</li>
+      <li>If you're inside an app wrapper, open this page in Chrome or Meta Quest Browser instead.</li>
+    </ol>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      <button id="dlNotify" type="button" style="border:1px solid #596575;border-radius:9px;padding:8px 12px;background:#303a48;color:#fff">Turn on notifications</button>
+      <button id="dlChrome" type="button" style="border:1px solid #596575;border-radius:9px;padding:8px 12px;background:#303a48;color:#fff">Open in Chrome</button>
+      <button id="dlRetry" type="button" style="border-radius:9px;padding:8px 12px;background:#478cbf;color:#fff">Try download again</button>
+      <button id="dlDiag" type="button" style="border:1px solid #596575;border-radius:9px;padding:8px 12px;background:#303a48;color:#fff">Run download check</button>
+      <button id="dlClose" type="button" style="border:1px solid #596575;border-radius:9px;padding:8px 12px;background:#303a48;color:#fff">Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="exportModal" role="dialog" aria-modal="true" aria-labelledby="exportTitle">
+  <div class="export-card">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <div style="flex:1"><h2 id="exportTitle" style="font-size:20px;font-weight:700;margin:0">Export Center</h2>
+      <p style="font-size:12px;color:#c3ccd7;margin:5px 0 0">Choose a target. Native builds need a compatible compiler/build service.</p></div>
+      <button id="closeExport" class="action" aria-label="Close export center">✕</button>
+    </div>
+    <div class="export-grid" id="exportTargets">
+      <button class="target active" data-target="quest"><strong>🥽 Quest (project ZIP)</strong><small>Quest 2 / 3 / 3S / Pro · editable project ZIP + PWA route to an APK</small></button>
+      <button class="target" data-target="android"><strong>📱 Android (project ZIP)</strong><small>Project data for an Android build pipeline</small></button>
+      <button class="target" data-target="aab"><strong>🏪 Android App Bundle</strong><small>AAB package for supported publishing workflows</small></button>
+      <button class="target" data-target="webxr"><strong>🌐 WebXR VR</strong><small>Browser-based VR project for HTTPS hosting</small></button>
+      <button class="target" data-target="html5"><strong>🕸️ Web / HTML5</strong><small>Browser game project package</small></button>
+      <button class="target" data-target="windows"><strong>🖥️ Windows PC</strong><small>Desktop build target</small></button>
+      <button class="target" data-target="pcvr"><strong>🎮 PC VR / OpenXR</strong><small>Compatible desktop VR runtime target</small></button>
+      <button class="target" data-target="linux"><strong>🐧 Linux</strong><small>Desktop build target</small></button>
+      <button class="target" data-target="macos"><strong>🍎 macOS</strong><small>Desktop build target</small></button>
+      <button class="target" data-target="project"><strong>📦 Editable Project ZIP</strong><small>Download your scene and imported source files</small></button>
+    </div>
+    <div id="exportNote" style="font-size:13px;line-height:1.5;color:#d5dce5;background:#171c23;border-radius:10px;padding:10px;margin-top:12px">
+      A browser page cannot compile a native APK. This exports a project ZIP. To get a Quest-installable APK, host this page over HTTPS and run it through pwabuilder.com.
+    </div>
+    <div class="export-actions">
+      <button id="downloadProjectZip" class="action primary">Download editable project ZIP</button>
+      <button id="exportAllBtn" class="action">Download all projects (projects.json)</button>
+      <button id="downloadWebPackage" class="action">Download web package ZIP</button>
+      <button id="cancelExport" class="action">Close</button>
+    </div>
+    <div class="export-actions">
+      <button id="copyProject" class="action">Copy project as text</button>
+      <button id="pasteProject" class="action">Load from pasted text</button>
+    </div>
+    <textarea id="projText" style="display:none;height:120px;margin-top:10px" placeholder="Paste project text here"></textarea>
+    <button id="projLoad" class="action primary" style="display:none;margin-top:8px">Load this text</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const app = $('#app'), wrap = $('#wrap');
+  let KEY = 'gang-vr-scene';
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  let tT;
+  const toast = m => { log(m); const t = $('#toast'); t.textContent = m; t.style.opacity = 1; clearTimeout(tT); tT = setTimeout(() => t.style.opacity = 0, 3800); };
+  addEventListener('error', e => log('Error: ' + (e.message || e), 'err'));
+  addEventListener('unhandledrejection', e => log('Error: ' + ((e.reason && e.reason.message) || e.reason), 'err'));
+  if (!window.THREE) { wrap.insertAdjacentHTML('afterbegin', '<p class="p-6 text-rose-400">Could not load Three.js. Check your connection.</p>'); return; }
+
+  /* ---------- Three.js + WebXR ---------- */
+  const scene = new THREE.Scene(); scene.background = new THREE.Color(0x2b3340);
+  const camera = new THREE.PerspectiveCamera(60, 1, 0.05, 500);
+  const rig = new THREE.Group(); rig.add(camera); scene.add(rig);
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+  renderer.xr.enabled = true; renderer.xr.setReferenceSpaceType('local-floor');
+  const cv = renderer.domElement;
+  cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block';
+  wrap.prepend(cv);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x333344, 0.9));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.8); sun.position.set(6, 12, 8); scene.add(sun);
+  const grid = new THREE.GridHelper(40, 40, 0x6366f1, 0x2a2a35); scene.add(grid);
+  const geos = { cube: new THREE.BoxGeometry(1, 1, 1), sphere: new THREE.SphereGeometry(0.5, 32, 16), cylinder: new THREE.CylinderGeometry(0.5, 0.5, 1, 32) };
+
+  /* ---------- Data ---------- */
+  const D = (name, shape, p, s, color, extra = {}) => ({ name, shape, p, r: [0, 0, 0], s, color, physics: false, solid: true, grab: false, script: '', ...extra });
+  const defaults = {
+    cube:     () => D('Cube', 'cube', [0, 0.5, 0], [1, 1, 1], '#478cbf'),
+    sphere:   () => D('Sphere', 'sphere', [0, 1, 0], [0.4, 0.4, 0.4], '#f43f5e', { physics: true, grab: true }),
+    cylinder: () => D('Cylinder', 'cylinder', [0, 0.5, 0], [0.5, 1, 0.5], '#f59e0b'),
+    ground:   () => D('Ground', 'cube', [0, -0.25, 0], [24, 0.5, 24], '#52525b'),
+    spawn:    () => D('VR Spawn', 'cylinder', [0, 0.025, 3], [0.8, 0.05, 0.8], '#10b981', { solid: false, spawn: true }),
+  };
+  const NT = { cube: 'MeshInstance3D', sphere: 'RigidBody3D', cylinder: 'MeshInstance3D', ground: 'StaticBody3D', spawn: 'XROrigin3D' };
+  let objs = [], uid = 1, sel = null, helper = null;
+  const project = { name: 'project', files: {} };
+  const TEXT = /\.(txt|json|js|mjs|html|css|md|glsl|xml|csv|gltf|obj|mtl|svg|ts|tscn|tres|gd|godot|cfg|import|uid|gdshader|shader)$/i, MODEL = /\.(glb|gltf|obj|fbx|stl)$/i;
+
+  function place(o, m) {
+    const b = new THREE.Box3().setFromObject(m), c = b.getCenter(new THREE.Vector3()), z = b.getSize(new THREE.Vector3());
+    m.position.sub(c); o.mesh.clear(); o.mesh.add(m); o.bs = [z.x || 1, z.y || 1, z.z || 1];
+    if (o.fit) {
+      const mx = Math.max(...o.bs), k = (mx > 6 || mx < 0.2) ? 2 / mx : 1;
+      o.s = [k, k, k]; o.p[1] = o.bs[1] * k / 2; delete o.fit; sync(o); if (sel === o) renderInsp();
+    }
+  }
+  function attachModel(o) {
+    const f = project.files[o.file]; if (!f) return;
+    const ext = o.file.split('.').pop().toLowerCase();
+    const buf = typeof f === 'string' ? new TextEncoder().encode(f).buffer : f.buffer.slice(f.byteOffset, f.byteOffset + f.byteLength);
+    const text = typeof f === 'string' ? f : new TextDecoder().decode(f);
+    const fail = e => toast('Could not load ' + o.file + (e && e.message ? ': ' + e.message : ''));
+    try {
+      if (ext === 'glb' || ext === 'gltf') new THREE.GLTFLoader().parse(ext === 'gltf' ? text : buf, '', g => place(o, g.scene), fail);
+      else if (ext === 'obj') place(o, new THREE.OBJLoader().parse(text));
+      else if (ext === 'fbx') place(o, new THREE.FBXLoader().parse(buf, ''));
+      else if (ext === 'stl') place(o, new THREE.Mesh(new THREE.STLLoader().parse(buf), new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.6 })));
+    } catch (e) { fail(e); }
+  }
+  function build(o) {
+    o.bs = [1, 1, 1]; o.v = [0, 0, 0];
+    if (o.shape === 'empty') { o.mesh = new THREE.Group(); o.mesh.add(new THREE.AxesHelper(0.25)); o.bs = [0.1, 0.1, 0.1]; }
+    else if (o.shape === 'model') {
+      o.mesh = new THREE.Group();
+      o.mesh.add(new THREE.Mesh(geos.cube, new THREE.MeshBasicMaterial({ color: 0xf59e0b, wireframe: true })));
+      attachModel(o);
+    } else o.mesh = new THREE.Mesh(geos[o.shape], new THREE.MeshStandardMaterial({ color: o.color, roughness: 0.6 }));
+    o.mesh.userData.o = o; scene.add(o.mesh); sync(o); return o;
+  }
+  function sync(o) {
+    o.mesh.position.set(...o.p); o.mesh.rotation.set(...o.r.map(d => d * Math.PI / 180)); o.mesh.scale.set(...o.s);
+  }
+  function make(kind, at) {
+    const o = { id: uid++, nt: NT[kind], ...defaults[kind]() };
+    if (at && kind !== 'ground') { o.p[0] = Math.round(at[0]); o.p[2] = Math.round(at[2]); }
+    objs.push(o); return build(o);
+  }
+  const plain = o => { const { mesh, v, grounded, fn, held, bs, gd, gdErr, ...rest } = o; return rest; };
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ uid, objs: objs.map(plain) })); } catch (e) {} idbSchedule(); };
+  function applyScene(d) {
+    select(null); objs.forEach(o => scene.remove(o.mesh)); objs = [];
+    uid = d.uid || 1; d.objs.forEach(o => { uid = Math.max(uid, (o.id || 0) + 1); objs.push(o); build(o); });
+    renderList(); save();
+  }
+  function loadDefault() {
+    try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && d.objs && d.objs.length) return applyScene(d); } catch (e) {}
+    make('ground'); make('spawn');
+    const t = make('cube'); t.name = 'Table'; t.p = [0, 0.4, -1.5]; t.s = [1.4, 0.8, 0.7]; t.color = '#3f3f46'; t.mesh.material.color.set(t.color); sync(t);
+    const a = make('sphere'); a.p = [-0.3, 1.5, -1.5]; sync(a);
+    const b = make('cube'); b.name = 'Block'; b.p = [0.3, 1.5, -1.5]; b.s = [0.25, 0.25, 0.25]; b.physics = b.grab = true; sync(b);
+    renderList();
+  }
+
+  /* ---------- Godot support: output, GDScript, .tscn ---------- */
+  function log(m, cls) {
+    const d = $('#outList'); if (!d) return;
+    const p = document.createElement('div');
+    p.className = cls === 'err' ? 'text-rose-400' : cls === 'warn' ? 'text-amber-300' : 'text-zinc-300';
+    p.textContent = m; d.appendChild(p); d.scrollTop = d.scrollHeight;
+  }
+  $('#outClr').onclick = () => { $('#outList').innerHTML = ''; };
+  const isGD = s => /^\s*(extends\b|func\b|@export|@onready|class_name\b)/m.test(s);
+
+  class V3 {
+    constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z; }
+    length() { return Math.hypot(this.x, this.y, this.z); }
+    normalized() { const l = this.length() || 1; return new V3(this.x / l, this.y / l, this.z / l); }
+    distance_to(b) { return Math.hypot(this.x - b.x, this.y - b.y, this.z - b.z); }
+    dot(b) { return this.x * b.x + this.y * b.y + this.z * b.z; }
+  }
+  const Vector3 = Object.assign((x, y, z) => new V3(x, y, z), { ZERO: new V3(), ONE: new V3(1, 1, 1), UP: new V3(0, 1, 0), DOWN: new V3(0, -1, 0), FORWARD: new V3(0, 0, -1), BACK: new V3(0, 0, 1), LEFT: new V3(-1, 0, 0), RIGHT: new V3(1, 0, 0) });
+  const vref = (a, k) => {
+    const v = new V3(), ax = i => ({ get: () => a[i] * k, set: n => { a[i] = n / k; } });
+    Object.defineProperties(v, { x: ax(0), y: ax(1), z: ax(2) }); return v;
+  };
+  let curO = null;
+  function defNode(t, o) {
+    const D = Math.PI / 180;
+    const vp = (key, k) => ({ get: () => vref(o[key], k), set: v => { o[key][0] = v.x / k; o[key][1] = v.y / k; o[key][2] = v.z / k; }, configurable: true });
+    Object.defineProperties(t, {
+      position: vp('p', 1), global_position: vp('p', 1), rotation: vp('r', D), rotation_degrees: vp('r', 1), scale: vp('s', 1),
+      visible: { get: () => o.mesh.visible, set: v => { o.mesh.visible = !!v; }, configurable: true },
+      name: { get: () => o.name, configurable: true },
+    });
+    t.rotate_y = a => { o.r[1] += a / D; }; t.rotate_x = a => { o.r[0] += a / D; }; t.rotate_z = a => { o.r[2] += a / D; };
+    t.translate = v => { o.p[0] += v.x; o.p[1] += v.y; o.p[2] += v.z; };
+  }
+  class GDBase { constructor() { defNode(this, curO); } }
+  const $g = n => {
+    const nm = String(n).split('/').pop(), o = objs.find(x => x.name === nm);
+    if (!o) { log('Node not found: ' + n, 'warn'); return null; }
+    const w = {}; defNode(w, o); return w;
+  };
+  const kd = new Set();
+  addEventListener('keydown', e => { if (!/INPUT|TEXTAREA/.test(e.target.tagName)) kd.add(e.key.toLowerCase()); });
+  addEventListener('keyup', e => kd.delete(e.key.toLowerCase()));
+  const AM = { ui_left: ['arrowleft', 'a'], ui_right: ['arrowright', 'd'], ui_up: ['arrowup', 'w'], ui_down: ['arrowdown', 's'], ui_accept: [' ', 'enter'], jump: [' '] };
+  const stick = () => {
+    const c = ctrls.find(c => c.userData.src && c.userData.src.handedness === 'left'), ax = c && c.userData.src.gamepad && c.userData.src.gamepad.axes;
+    return ax ? [ax[2] || 0, ax[3] || 0] : [0, 0];
+  };
+  const Input = {
+    is_action_pressed: a => {
+      const [sx, sy] = stick();
+      return (AM[a] || [String(a).toLowerCase()]).some(k => kd.has(k)) || (a === 'ui_left' && sx < -0.5) || (a === 'ui_right' && sx > 0.5) || (a === 'ui_up' && sy < -0.5) || (a === 'ui_down' && sy > 0.5);
+    },
+    get_axis: (n, p) => (Input.is_action_pressed(p) ? 1 : 0) - (Input.is_action_pressed(n) ? 1 : 0),
+  };
+  const API = {
+    GDBase, Vector3, Input, $g, get_node: $g, print: (...a) => log(a.join(' ')), str: String, len: x => x.length,
+    range: (a, b, c = 1) => { if (b === undefined) { b = a; a = 0; } const r = []; for (let i = a; c > 0 ? i < b : i > b; i += c) r.push(i); return r; },
+    sin: Math.sin, cos: Math.cos, tan: Math.tan, abs: Math.abs, sqrt: Math.sqrt, min: Math.min, max: Math.max, floor: Math.floor, ceil: Math.ceil, round: Math.round, pow: Math.pow, PI: Math.PI, TAU: Math.PI * 2,
+    lerp: (a, b, t) => a + (b - a) * t, clamp: (v, a, b) => Math.min(b, Math.max(a, v)), deg_to_rad: d => d * Math.PI / 180, rad_to_deg: r => r * 180 / Math.PI,
+    randf: Math.random, randi_range: (a, b) => a + Math.floor(Math.random() * (b - a + 1)),
+  };
+
+  /* GDScript (common subset) -> JavaScript class */
+  function gd2js(src) {
+    const fields = new Set(['position', 'global_position', 'rotation', 'rotation_degrees', 'scale', 'visible']), methods = new Set();
+    const lines = src.replace(/\r/g, '').split('\n').map(l => {
+      let q = null, out = '';
+      for (let i = 0; i < l.length; i++) {
+        const c = l[i];
+        if (q) { out += c; if (c === '\\') out += l[++i] || ''; else if (c === q) q = null; }
+        else if (c === '"' || c === "'") { q = c; out += c; }
+        else if (c === '#') break;
+        else out += c;
+      }
+      return out.replace(/\s+$/, '');
+    });
+    const decl = /^(?:@\w+(?:\([^)]*\))?\s*)*(?:static\s+)?(var|const)\s+([A-Za-z_]\w*)\s*(?::\s*[\w.\[\]]+)?\s*(?::?=\s*(.*))?$/;
+    const fre = /^(?:static\s+)?func\s+([A-Za-z_]\w*)\s*\(([^)]*)\)\s*(?:->\s*[\w.\[\]]+\s*)?:$/;
+    lines.forEach(l => { if (/^\S/.test(l)) { const m = decl.exec(l), f = fre.exec(l); if (m) fields.add(m[2]); if (f) methods.add(f[1]); } });
+    const ex = (s, loc) => s.split(/("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/).map((p, i) => i % 2 ? p : p
+      .replace(/\band\b/g, '&&').replace(/\bor\b/g, '||').replace(/\bnot\b/g, '!').replace(/\bself\b/g, 'this')
+      .replace(/(?<![\w.$])([A-Za-z_]\w*)/g, (m, id) => (fields.has(id) || methods.has(id)) && !loc.has(id) ? 'this.' + id : m)
+      .replace(/\$([A-Za-z_][\w\/]*)/g, '$g("$1")')).join('');
+    const inits = [], onr = [], cls = [], stack = []; let loc = null;
+    for (const raw of lines) {
+      if (!raw.trim()) continue;
+      const I = raw.match(/^[\t ]*/)[0].replace(/\t/g, '    ').length, t = raw.trim();
+      let closing = 0, pre = '';
+      while (stack.length && I <= stack[stack.length - 1]) { stack.pop(); closing++; }
+      if (/^(elif\b|else\b)/.test(t) && closing > 0 && I > 0) { closing--; pre = '} '; }
+      if (closing) cls.push('}'.repeat(closing));
+      if (I === 0) {
+        const f = fre.exec(t);
+        if (f) {
+          loc = new Set();
+          const ps = f[2].split(',').map(x => x.trim()).filter(Boolean).map(x => {
+            const m = /^([A-Za-z_]\w*)\s*(?::\s*[\w.\[\]]+)?\s*(?:=\s*(.*))?$/.exec(x); loc.add(m[1]); return m[1] + (m[2] ? '=' + ex(m[2], loc) : '');
+          });
+          cls.push(f[1] + '(' + ps.join(',') + '){'); stack.push(0); continue;
+        }
+        const d = decl.exec(t);
+        if (d) { const line = 'this.' + d[2] + '=' + (d[3] ? ex(d[3], new Set()) : 'undefined') + ';'; (/@onready/.test(t) ? onr : inits).push(line); }
+        continue;
+      }
+      if (!loc) continue;
+      let line, m;
+      if (t === 'pass') line = '';
+      else if ((m = /^(if|elif|while)\s+(.*):$/.exec(t))) { line = (m[1] === 'elif' ? 'else if' : m[1]) + ' (' + ex(m[2], loc) + ') {'; stack.push(I); }
+      else if (/^else\s*:$/.test(t)) { line = 'else {'; stack.push(I); }
+      else if ((m = /^for\s+([A-Za-z_]\w*)(?:\s*:\s*\w+)?\s+in\s+(.*):$/.exec(t))) { loc.add(m[1]); line = 'for (let ' + m[1] + ' of ' + ex(m[2], loc) + ') {'; stack.push(I); }
+      else if (/^match\b/.test(t)) throw new Error("'match' is not supported yet");
+      else if ((m = decl.exec(t)) && /^(var|const)\b/.test(t)) { loc.add(m[2]); line = 'let ' + m[2] + ' = ' + (m[3] ? ex(m[3], loc) : 'undefined') + ';'; }
+      else line = ex(t, loc) + ';';
+      cls.push(pre + line);
+    }
+    while (stack.length) { stack.pop(); cls.push('}'); }
+    return 'class extends GDBase{constructor(){super();' + inits.join('') + '}_onready(){' + onr.join('') + '}' + cls.join('\n') + '}';
+  }
+  // END gd2js
+  const gdCache = new Map();
+  function makeGD(o) {
+    let C = gdCache.get(o.script);
+    if (!C) { C = new Function('api', 'with(api){return ' + gd2js(o.script) + '}')(API); gdCache.set(o.script, C); }
+    curO = o; const g = new C(); g._onready(); if (g._ready) g._ready(); return g;
+  }
+  function runGD(o, dt) {
+    if (o.gd === undefined) { o.gd = null; try { o.gd = makeGD(o); } catch (e) { o.gdErr = true; log('✖ ' + (o.scriptPath || o.name) + ': ' + e.message, 'err'); } }
+    if (!o.gd || o.gdErr) return;
+    try { if (o.gd._process) o.gd._process(dt); if (o.gd._physics_process) o.gd._physics_process(dt); }
+    catch (e) { o.gdErr = true; log('✖ ' + (o.scriptPath || o.name) + ': ' + e.message, 'err'); }
+  }
+
+  /* Godot .tscn scenes */
+  const BODY = { StaticBody3D: 's', AnimatableBody3D: 's', CharacterBody3D: 's', RigidBody3D: 'r' };
+  function resolve(p) {
+    const rel = String(p).replace(/^res:\/\//, ''), k = (project.root || '') + rel;
+    if (project.files[k] !== undefined) return k;
+    if (project.files[rel] !== undefined) return rel;
+    return Object.keys(project.files).find(x => x.endsWith('/' + rel)) || null;
+  }
+  const nums = s => (String(s || '').replace(/^\w+\(/, '').match(/-?\d*\.?\d+(?:e-?\d+)?/g) || []).map(Number);
+  const refId = v => { const m = /\("([^"]+)"\)/.exec(v || ''); return m && m[1]; };
+  const hexCol = v => { const a = nums(v); return a.length >= 3 ? '#' + a.slice(0, 3).map(c => Math.round(Math.min(1, Math.max(0, c)) * 255).toString(16).padStart(2, '0')).join('') : null; };
+  function parseTscn(text) {
+    const ext = {}, sub = {}, nodes = []; let cur = null;
+    const attrs = str => { const o = {}; for (const m of str.matchAll(/(\w+)=("[^"]*"|\w+\([^)]*\)|[^\s\]]+)/g)) o[m[1]] = m[2].replace(/^"|"$/g, ''); return o; };
+    text.split('\n').forEach(line => {
+      line = line.trim(); if (!line || line[0] === ';') return;
+      const h = /^\[(\w+)\s*(.*)\]$/.exec(line);
+      if (h) {
+        const a = attrs(h[2]);
+        if (h[1] === 'ext_resource') { ext[a.id] = a; cur = null; }
+        else if (h[1] === 'sub_resource') cur = sub[a.id] = { type: a.type, props: {} };
+        else if (h[1] === 'node') { cur = { name: a.name, type: a.type, parent: a.parent, instance: a.instance, props: {} }; nodes.push(cur); }
+        else cur = null;
+        return;
+      }
+      const m = /^(\w+(?:\/\w+)*)\s*=\s*(.*)$/.exec(line); if (m && cur) cur.props[m[1]] = m[2];
+    });
+    return { ext, sub, nodes };
+  }
+  function importTscn(path, M, depth) {
+    const text = project.files[path]; if (depth > 4 || typeof text !== 'string') return 0;
+    const t = parseTscn(text), wm = {}, ctx = {}; let n = 0;
+    t.nodes.forEach((nd, i) => {
+      const key = i === 0 ? '.' : (nd.parent === '.' ? nd.name : nd.parent + '/' + nd.name), pk = i === 0 ? null : nd.parent;
+      const lm = new THREE.Matrix4(), a = nums(nd.props.transform);
+      if (a.length >= 12) lm.set(a[0], a[1], a[2], a[9], a[3], a[4], a[5], a[10], a[6], a[7], a[8], a[11], 0, 0, 0, 1);
+      const m = new THREE.Matrix4().multiplyMatrices(pk === null ? M : (wm[pk] || M), lm); wm[key] = m;
+      const type = nd.type || 'Node3D', c = BODY[type] || (pk !== null ? ctx[pk] : null) || null; ctx[key] = c;
+      const inst = t.ext[refId(nd.instance)];
+      if (inst && /\.tscn$/i.test(inst.path)) { n += importTscn(resolve(inst.path), m, depth + 1); return; }
+      const P = new THREE.Vector3(), Q = new THREE.Quaternion(), S = new THREE.Vector3(); m.decompose(P, Q, S);
+      const E = new THREE.Euler().setFromQuaternion(Q), deg = x => Math.round(x * 18000 / Math.PI) / 100, rd = x => Math.round(x * 1000) / 1000;
+      const o = { id: uid++, name: nd.name, nt: type, depth: depth * 2 + (key === '.' ? 0 : key.split('/').length), p: P.toArray().map(rd), r: [E.x, E.y, E.z].map(deg), s: S.toArray().map(rd), color: '#9aa4b2', physics: false, solid: false, grab: false, script: '', shape: 'empty' };
+      if (type === 'MeshInstance3D' || inst) {
+        const mr = refId(nd.props.mesh) || refId(nd.instance), sub = t.sub[mr], ext = t.ext[mr];
+        if (ext && MODEL.test(ext.path)) { o.shape = 'model'; o.file = resolve(ext.path) || ext.path; }
+        else if (sub) {
+          const pr = sub.props, f = k => parseFloat(pr[k]);
+          if (sub.type === 'SphereMesh') { const r = f('radius') || 0.5; o.shape = 'sphere'; o.s = o.s.map(v => v * 2 * r); }
+          else if (/Cylinder|Capsule/.test(sub.type)) { const r = Math.max(f('top_radius') || 0.5, f('bottom_radius') || 0.5, f('radius') || 0), h = f('height') || 2; o.shape = 'cylinder'; o.s = [o.s[0] * 2 * r, o.s[1] * h, o.s[2] * 2 * r]; }
+          else if (sub.type === 'PlaneMesh') { const z = nums(pr.size); o.shape = 'cube'; o.s = [o.s[0] * (z[0] || 2), 0.02, o.s[2] * (z[1] || 2)]; }
+          else { const z = nums(pr.size); o.shape = 'cube'; o.s = [o.s[0] * (z[0] || 1), o.s[1] * (z[1] || 1), o.s[2] * (z[2] || 1)]; }
+          const mat = t.sub[refId(nd.props.material_override) || refId(pr.material)], col = mat && hexCol(mat.props.albedo_color); if (col) o.color = col;
+        }
+      }
+      if (o.shape !== 'empty') { o.solid = !!c; o.physics = c === 'r'; }
+      if (type === 'XROrigin3D') o.spawn = true;
+      const sr = t.ext[refId(nd.props.script)];
+      if (sr) { const sp = resolve(sr.path); if (sp && typeof project.files[sp] === 'string') { o.script = project.files[sp]; o.scriptPath = sp; } }
+      objs.push(o); build(o); n++;
+    });
+    return n;
+  }
+  function openScene(sp) {
+    applyScene({ objs: [], uid: 1 });
+    const n = importTscn(sp, new THREE.Matrix4(), 0);
+    if (!objs.some(o => o.spawn)) make('spawn');
+    const b = new THREE.Box3(); objs.forEach(o => b.expandByPoint(new THREE.Vector3(...o.p)));
+    b.getCenter(tgt); dist = Math.min(60, Math.max(6, b.getSize(new THREE.Vector3()).length() * 1.3));
+    renderList(); save(); log('Opened ' + sp + ' (' + n + ' nodes)'); return n;
+  }
+  function importGodot(pg) {
+    project.root = pg.slice(0, -'project.godot'.length);
+    const txt = project.files[pg], nm = /config\/name="([^"]*)"/.exec(txt), ms = /run\/main_scene="([^"]*)"/.exec(txt);
+    if (nm) project.name = nm[1];
+    const sp = (ms && resolve(ms[1])) || Object.keys(project.files).find(k => /\.tscn$/i.test(k));
+    if (!sp) { log('Godot project found, but it has no .tscn scene files. You can still edit its scripts and attach them to nodes.', 'warn'); return 0; }
+    return openScene(sp);
+  }
+
+  /* ---------- Selection / Hierarchy ---------- */
+  function select(o) {
+    sel = o; if (helper) { scene.remove(helper); helper = null; }
+    if (o) { helper = new THREE.BoxHelper(o.mesh, 0xa5b4fc); scene.add(helper); }
+    renderList(); renderInsp();
+  }
+  function renderList() {
+    const q = $('#search').value.toLowerCase(), ul = $('#list'); ul.innerHTML = '';
+    objs.filter(o => o.name.toLowerCase().includes(q)).forEach(o => {
+      const li = document.createElement('li');
+      li.className = 'flex items-center gap-2 rounded-lg px-2.5 py-2 cursor-pointer border transition ' + (o === sel ? 'bg-indigo-500/20 border-indigo-400/40' : 'border-transparent hover:bg-white/5');
+      li.innerHTML = `<span class="w-3 h-3 ${o.shape === 'sphere' ? 'rounded-full' : 'rounded-sm'}" style="background:${o.shape === 'model' ? '#f59e0b' : o.color}"></span>
+        <span class="flex-1 truncate text-sm" style="padding-left:${(o.depth || 0) * 12}px">${esc(o.name)} <span class="text-[10px] text-zinc-500">${esc(o.nt || '')}</span></span>
+        <button class="opacity-60 hover:opacity-100 hover:text-rose-400 p-1" title="Delete"><svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>`;
+      li.onclick = () => { if (!playing) select(o); };
+      li.querySelector('button').onclick = e => { e.stopPropagation(); if (playing) return; if (sel === o) select(null); scene.remove(o.mesh); objs = objs.filter(x => x !== o); renderList(); save(); };
+      ul.appendChild(li);
+    });
+    if (!ul.children.length) ul.innerHTML = '<li class="text-center text-zinc-500 text-sm py-8">Nothing here yet</li>';
+  }
+
+  /* ---------- Files (zip contents) ---------- */
+  function renderFiles() {
+    const q = $('#search').value.toLowerCase(), ul = $('#files'); ul.innerHTML = '';
+    Object.keys(project.files).sort().filter(p => p.toLowerCase().includes(q)).forEach(p => {
+      const f = project.files[p], isT = typeof f === 'string', isM = MODEL.test(p);
+      const li = document.createElement('li');
+      li.className = 'flex items-center gap-2 rounded-lg px-2.5 py-2 border border-transparent hover:bg-white/5 transition';
+      li.innerHTML = `<span class="flex-1 truncate text-sm" title="${esc(p)}">${esc(p)}</span>` +
+        (isT ? '<button class="rounded-lg border border-white/10 px-2 py-1 text-xs hover:bg-white/5">Edit</button>' :
+          isM ? '<button class="rounded-lg bg-indigo-500 px-2 py-1 text-xs">Add</button>' : '<span class="text-xs text-zinc-500">asset</span>');
+      const b = li.querySelector('button');
+      if (b) b.onclick = () => isT ? openEditor(p) : addModel(p);
+      if (isT && isM) { const a = document.createElement('button'); a.className = 'rounded-lg bg-indigo-500 px-2 py-1 text-xs'; a.textContent = 'Add'; a.onclick = () => addModel(p); li.appendChild(a); }
+      const xb = (txt, fnc) => { const a = document.createElement('button'); a.className = 'rounded-lg bg-indigo-500 px-2 py-1 text-xs'; a.textContent = txt; a.onclick = fnc; li.appendChild(a); };
+      if (/\.gd$/i.test(p)) xb('Attach', () => { if (!sel) return toast('Select a node first'); sel.script = project.files[p]; sel.scriptPath = p; sel.gd = undefined; sel.gdErr = false; renderInsp(); save(); toast('Attached ' + p + ' to ' + sel.name); });
+      if (/\.tscn$/i.test(p)) xb('Open', () => { if (!playing) { openScene(p); app.dataset.tab = 'scene'; syncTabs(); setTimeout(resize, 0); } });
+      ul.appendChild(li);
+    });
+    if (!ul.children.length) ul.innerHTML = '<li class="text-center text-zinc-500 text-sm py-8">Import a .zip or .glb to see files</li>';
+  }
+  function setSeg(s) {
+    $('#list').style.display = s === 'scene' ? '' : 'none'; $('#files').style.display = s === 'files' ? '' : 'none';
+    document.querySelectorAll('[data-seg]').forEach(b => b.classList.toggle('tab-on', b.dataset.seg === s));
+    s === 'files' ? renderFiles() : renderList();
+  }
+  document.querySelectorAll('[data-seg]').forEach(b => b.onclick = () => setSeg(b.dataset.seg));
+  function addModel(path) {
+    if (playing) return;
+    const o = { id: uid++, name: path.split('/').pop().replace(/\.\w+$/, ''), shape: 'model', nt: 'MeshInstance3D', file: path, p: [Math.round(tgt.x), 0, Math.round(tgt.z)], r: [0, 0, 0], s: [1, 1, 1], color: '#ffffff', physics: false, solid: true, grab: false, script: '', fit: true };
+    objs.push(o); build(o); select(o); save(); app.dataset.tab = 'scene'; syncTabs(); setTimeout(resize, 0);
+  }
+  async function readArchive(file) {
+    const u8 = new Uint8Array(await file.arrayBuffer()), out = {};
+    const dec = new TextDecoder();
+    if (/\.rar$/i.test(file.name) || (u8[0] === 0x52 && u8[1] === 0x61 && u8[2] === 0x72 && u8[3] === 0x21)) {
+      let mod, wasmBinary;
+      try {
+        mod = await import('https://cdn.jsdelivr.net/npm/node-unrar-js@2.0.2/+esm');
+        wasmBinary = await (await fetch('https://cdn.jsdelivr.net/npm/node-unrar-js@2.0.2/esm/js/unrar.wasm')).arrayBuffer();
+      } catch (e) { throw new Error('RAR engine could not load here. Re-save the file as .zip and import that.'); }
+      const ex = await mod.createExtractorFromData({ data: u8, wasmBinary });
+      for (const f of ex.extract().files) {
+        const n = f.fileHeader.name;
+        if (f.fileHeader.flags.directory || !f.extraction || n.startsWith('__MACOSX')) continue;
+        out[n] = TEXT.test(n) ? dec.decode(f.extraction.data) : f.extraction.data;
+      }
+    } else {
+      if (!window.JSZip) throw new Error('Zip library failed to load');
+      const z = await JSZip.loadAsync(u8);
+      for (const e of Object.values(z.files)) if (!e.dir && !e.name.startsWith('__MACOSX')) out[e.name] = TEXT.test(e.name) ? await e.async('string') : await e.async('uint8array');
+    }
+    return out;
+  }
+  function autoAdd() {
+    const used = new Set(objs.map(o => o.file));
+    const paths = Object.keys(project.files).filter(p => MODEL.test(p) && !used.has(p)).slice(0, 25);
+    paths.forEach((p, i) => {
+      const o = { id: uid++, name: p.split('/').pop().replace(/\.\w+$/, ''), shape: 'model', nt: 'MeshInstance3D', file: p, p: [(i % 5) * 3 - 6, 0, -Math.floor(i / 5) * 3 - 3], r: [0, 0, 0], s: [1, 1, 1], color: '#ffffff', physics: false, solid: true, grab: false, script: '', fit: true };
+      objs.push(o); build(o);
+    });
+    if (paths.length) { save(); renderList(); }
+    return paths.length;
+  }
+  async function importFile(file) {
+    toast('Reading ' + file.name + '...');
+    try {
+      if (/\.(json|txt)$/i.test(file.name)) {
+        const tx = await file.text();
+        if (tx.includes('"gangVrProjects"')) { try { await importProjects(tx); } catch (e) { toast(e.message || 'Could not read projects file'); } return; }
+      }
+      const isArc = /\.(zip|rar)$/i.test(file.name);
+      if (isArc) { project.name = file.name.replace(/\.(zip|rar)$/i, ''); project.files = await readArchive(file); }
+      else project.files[file.name] = (TEXT.test(file.name) || /\.gltf$/i.test(file.name)) ? await file.text() : new Uint8Array(await file.arrayBuffer());
+      const total = Object.keys(project.files).length;
+      let added = 0;
+      const sj = project.files['scene.json'];
+      const pg = isArc && Object.keys(project.files).find(k => k === 'project.godot' || k.endsWith('/project.godot'));
+      if (pg) added = importGodot(pg);
+      else if (isArc && sj) { try { applyScene(JSON.parse(sj)); } catch (e) { toast('scene.json is not valid'); } }
+      else { objs.forEach(o => o.shape === 'model' && attachModel(o)); added = autoAdd(); }
+      setSeg('files');
+      app.dataset.tab = added ? 'scene' : 'hier'; syncTabs(); setTimeout(resize, 0);
+      toast(total + ' files loaded' + (added ? ', ' + added + ' object' + (added > 1 ? 's' : '') + ' added to the scene' : ''));
+    } catch (e) { toast(e.message || 'Could not read that file'); }
+  }
+  $('#btnZip').onclick = () => $('#zipIn').click();
+  $('#zipIn').onchange = e => { if (e.target.files[0]) importFile(e.target.files[0]); e.target.value = ''; };
+
+  /* code editor */
+  let edPath = null;
+  function openEditor(p) { edPath = p; $('#edName').textContent = p; $('#edText').value = project.files[p]; $('#ed').style.display = 'flex'; }
+  $('#edClose').onclick = () => { $('#ed').style.display = 'none'; };
+  $('#edSave').onclick = () => {
+    const v = $('#edText').value; project.files[edPath] = v;
+    if (edPath === 'scene.json') { try { applyScene(JSON.parse(v)); } catch (e) { return toast('Invalid JSON: ' + e.message); } }
+    if (MODEL.test(edPath)) objs.forEach(o => o.file === edPath && attachModel(o));
+    toast('Saved ' + edPath);
+  };
+
+  /* ---------- Inspector ---------- */
+  const vec = (label, k, step) => `<div><p class="text-[11px] text-zinc-400 mb-1">${label}</p><div class="grid grid-cols-3 gap-1.5">` +
+    [0, 1, 2].map(i => `<input data-v="${k}.${i}" type="number" step="${step}" value="${+sel[k][i].toFixed(3)}" aria-label="${label} ${'XYZ'[i]}">`).join('') + '</div></div>';
+  const check = (label, key) => `<label class="flex items-center justify-between rounded-lg border border-white/10 px-3 py-2 cursor-pointer"><span>${label}</span><input data-c="${key}" type="checkbox" class="w-4 h-4 accent-indigo-500" ${sel[key] ? 'checked' : ''}></label>`;
+  function renderInsp() {
+    const el = $('#insp');
+    if (!sel) { el.innerHTML = '<p class="text-zinc-500 text-center py-10">Select an object to edit it</p>'; return; }
+    el.innerHTML = `
+      <label class="block"><span class="block text-[11px] text-zinc-400 mb-1">Name</span><input data-n type="text" value="${esc(sel.name)}"></label>
+      <div><p class="text-xs uppercase tracking-wider text-zinc-400 mb-2">Transform</p><div class="space-y-2">${vec('Position', 'p', 0.25)}${vec('Rotation', 'r', 15)}${vec('Scale', 's', 0.1)}</div></div>
+      ${sel.shape === 'model' ? `<p class="text-xs text-zinc-400 truncate">Model: ${esc(sel.file)}</p>` : `<div><p class="text-xs uppercase tracking-wider text-zinc-400 mb-2">Renderer</p><input data-col type="color" value="${sel.color}"></div>`}
+      ${sel.spawn ? '<p class="text-xs text-zinc-400">Players start here when VR begins.</p>' : `<div><p class="text-xs uppercase tracking-wider text-zinc-400 mb-2">Components</p><div class="space-y-2">${check('Rigidbody (gravity)', 'physics')}${check('Collider (solid)', 'solid')}${check('Grabbable (VR)', 'grab')}</div></div>`}
+      <div><p class="text-xs uppercase tracking-wider text-zinc-400 mb-2">Script (GDScript or JavaScript)</p>
+        <textarea data-s rows="5" placeholder="// vars: o, dt, t, THREE&#10;o.r[1] += 60 * dt;" autocapitalize="off" spellcheck="false">${esc(sel.script || '')}</textarea></div>
+      <div class="grid grid-cols-2 gap-2">
+        <button id="foc" class="rounded-lg border border-white/10 hover:bg-white/5 py-2 transition">Focus</button>
+        <button id="dup" class="rounded-lg border border-white/10 hover:bg-white/5 py-2 transition">Duplicate</button>
+      </div>`;
+    el.querySelectorAll('[data-v]').forEach(i => i.oninput = () => { const [k, n] = i.dataset.v.split('.'); sel[k][+n] = parseFloat(i.value) || 0; sync(sel); save(); });
+    el.querySelector('[data-n]').oninput = e => { sel.name = e.target.value; renderList(); save(); };
+    const col = el.querySelector('[data-col]'); if (col) col.oninput = e => { sel.color = e.target.value; if (sel.mesh.material) sel.mesh.material.color.set(sel.color); renderList(); save(); };
+    el.querySelectorAll('[data-c]').forEach(i => i.onchange = () => { sel[i.dataset.c] = i.checked; save(); });
+    el.querySelector('[data-s]').oninput = e => { sel.script = e.target.value; sel.fn = null; save(); };
+    $('#foc').onclick = () => tgt.set(...sel.p);
+    $('#dup').onclick = () => {
+      const c = { ...plain(sel), id: uid++, name: sel.name + ' Copy', p: [sel.p[0] + 0.5, sel.p[1], sel.p[2] + 0.5], r: [...sel.r], s: [...sel.s] };
+      objs.push(c); build(c); select(c); save();
+    };
+  }
+  const syncInspPos = () => sel && document.querySelectorAll('[data-v^="p."]').forEach(i => i.value = +sel.p[+i.dataset.v[2]].toFixed(3));
+
+  /* ---------- Orbit camera (editor) ---------- */
+  const tgt = new THREE.Vector3(0, 1, 0);
+  let yaw = 0.5, pitch = 0.45, dist = 9;
+  function placeCam() {
+    camera.position.set(tgt.x + dist * Math.sin(yaw) * Math.cos(pitch), tgt.y + dist * Math.sin(pitch), tgt.z + dist * Math.cos(yaw) * Math.cos(pitch));
+    camera.lookAt(tgt);
+  }
+  const zoom = f => { dist = Math.min(60, Math.max(1.5, dist * f)); };
+  $('#zIn').onclick = () => zoom(1 / 1.2); $('#zOut').onclick = () => zoom(1.2);
+  cv.addEventListener('wheel', e => { e.preventDefault(); zoom(e.deltaY > 0 ? 1.1 : 1 / 1.1); }, { passive: false });
+  cv.addEventListener('contextmenu', e => e.preventDefault());
+
+  const ray = new THREE.Raycaster(), ptrs = new Map();
+  let drag = null, pinch = 0;
+  const ndc = e => { const r = cv.getBoundingClientRect(); return new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); };
+  const owner = m => { while (m && !m.userData.o) m = m.parent; return m && m.userData.o; };
+  function pick(e) { ray.setFromCamera(ndc(e), camera); const h = ray.intersectObjects(objs.map(o => o.mesh), true)[0]; return h ? owner(h.object) : null; }
+  cv.addEventListener('pointerdown', e => {
+    cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, e);
+    if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); drag = { t: 'pinch' }; return; }
+    if (playing) { drag = { t: 'orbit', x: e.clientX, y: e.clientY }; return; }
+    const h = pick(e);
+    if (h) {
+      if (h !== sel) select(h);
+      const pl = new THREE.Plane(new THREE.Vector3(0, 1, 0), -h.p[1]), pt = new THREE.Vector3();
+      ray.setFromCamera(ndc(e), camera); ray.ray.intersectPlane(pl, pt);
+      drag = { t: 'obj', pl, dx: h.p[0] - pt.x, dz: h.p[2] - pt.z };
+    } else { if (e.button !== 2) select(null); drag = { t: e.button === 2 ? 'pan' : 'orbit', x: e.clientX, y: e.clientY }; }
+  });
+  cv.addEventListener('pointermove', e => {
+    if (ptrs.has(e.pointerId)) ptrs.set(e.pointerId, e);
+    if (!drag) return;
+    if (drag.t === 'pinch' && ptrs.size === 2) { const [a, b] = [...ptrs.values()], d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); if (pinch) zoom(pinch / d); pinch = d; return; }
+    if (drag.t === 'obj') {
+      ray.setFromCamera(ndc(e), camera); const pt = new THREE.Vector3();
+      if (ray.ray.intersectPlane(drag.pl, pt)) { sel.p[0] = Math.round((pt.x + drag.dx) * 8) / 8; sel.p[2] = Math.round((pt.z + drag.dz) * 8) / 8; sync(sel); syncInspPos(); }
+    } else if (drag.t === 'orbit') {
+      yaw -= (e.clientX - drag.x) * 0.008; pitch = Math.min(1.5, Math.max(-0.2, pitch + (e.clientY - drag.y) * 0.008)); drag.x = e.clientX; drag.y = e.clientY;
+    } else if (drag.t === 'pan') {
+      const k = dist * 0.0018, dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      tgt.x -= Math.cos(yaw) * dx * k + Math.sin(yaw) * dy * k; tgt.z += Math.sin(yaw) * dx * k - Math.cos(yaw) * dy * k; drag.x = e.clientX; drag.y = e.clientY;
+    }
+  });
+  const pUp = e => { ptrs.delete(e.pointerId); if (drag && drag.t === 'obj') save(); if (ptrs.size < 2) drag = null; };
+  cv.addEventListener('pointerup', pUp); cv.addEventListener('pointercancel', pUp);
+
+  /* ---------- VR controllers ---------- */
+  const ctrls = [0, 1].map(i => {
+    const c = renderer.xr.getController(i);
+    c.userData = { vel: new THREE.Vector3(), last: null, held: null, src: null };
+    c.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, -2)]), new THREE.LineBasicMaterial({ color: 0xa5b4fc })));
+    c.add(new THREE.Mesh(new THREE.SphereGeometry(0.02, 12, 8), new THREE.MeshBasicMaterial({ color: 0xffffff })));
+    c.addEventListener('connected', e => { c.userData.src = e.data; });
+    c.addEventListener('disconnected', () => { c.userData.src = null; });
+    c.addEventListener('selectstart', () => {
+      if (!playing || c.userData.held) return;
+      const m = new THREE.Matrix4().extractRotation(c.matrixWorld);
+      ray.ray.origin.setFromMatrixPosition(c.matrixWorld); ray.ray.direction.set(0, 0, -1).applyMatrix4(m); ray.far = 4;
+      const h = ray.intersectObjects(objs.filter(o => o.grab).map(o => o.mesh), true)[0]; ray.far = Infinity;
+      if (!h) return;
+      const o = owner(h.object); o.held = true; o.v = [0, 0, 0]; c.userData.held = o; c.userData.last = null; c.userData.vel.set(0, 0, 0); c.attach(o.mesh);
+    });
+    c.addEventListener('selectend', () => release(c));
+    rig.add(c); return c;
+  });
+  function release(c) {
+    const o = c.userData.held; if (!o) return;
+    scene.attach(o.mesh); o.p = o.mesh.position.toArray(); o.r = o.mesh.rotation.toArray().slice(0, 3).map(r => r * 180 / Math.PI);
+    o.v = c.userData.vel.toArray(); o.held = false; c.userData.held = null;
+  }
+
+  /* ---------- Play / VR ---------- */
+  let playing = false, snap = null, last = 0, clock = 0, turnAt = 0;
+  const sz = (o, i) => o.s[i] * o.bs[i];
+  const hit = (a, b) => { for (let i = 0; i < 3; i++) if (Math.abs(a.p[i] - b.p[i]) >= (sz(a, i) + sz(b, i)) / 2 - 1e-4) return false; return true; };
+  function step(dt) {
+    clock += dt;
+    const statics = objs.filter(o => o.solid && !o.physics && !o.spawn);
+    objs.forEach((o, idx) => {
+      if (o.script && isGD(o.script)) runGD(o, dt);
+      else if (o.script && !o.held) {
+        if (!o.fn) { try { o.fn = new Function('o', 'dt', 't', 'THREE', o.script); } catch (e) { o.fn = () => {}; toast(o.name + ': ' + e.message); } }
+        try { o.fn(o, dt, clock, THREE); } catch (e) { o.fn = () => {}; toast(o.name + ': ' + e.message); }
+      }
+      if (o.physics && !o.held) {
+        o.v[1] -= 9.8 * dt; o.grounded = false; o.p[1] += o.v[1] * dt;
+        statics.forEach(s => { if (s !== o && hit(o, s)) { const h = (sz(s, 1) + sz(o, 1)) / 2; if (o.v[1] <= 0) { o.p[1] = s.p[1] + h; o.grounded = true; } else o.p[1] = s.p[1] - h; o.v[1] = 0; } });
+        [0, 2].forEach(ax => { const pv = o.p[ax]; o.p[ax] += o.v[ax] * dt; if (statics.some(s => s !== o && hit(o, s))) { o.p[ax] = pv; o.v[ax] = 0; } if (o.grounded) o.v[ax] *= Math.pow(0.02, dt); });
+        if (o.p[1] < -30) { o.p = [...snap[idx].p]; o.v = [0, 0, 0]; }
+      }
+      if (!o.held) sync(o);
+    });
+    if (renderer.xr.isPresenting) vrInput(dt);
+  }
+  const vd = new THREE.Vector3(), wp = new THREE.Vector3();
+  function vrInput(dt) {
+    const now = performance.now();
+    ctrls.forEach(c => {
+      const s = c.userData.src, ax = s && s.gamepad && s.gamepad.axes;
+      if (ax) {
+        const x = ax[2] || 0, y = ax[3] || 0;
+        if (s.handedness === 'left') { if (Math.hypot(x, y) > 0.15) { camera.getWorldDirection(vd); vd.y = 0; vd.normalize(); rig.position.x += (vd.x * -y - vd.z * x) * 3 * dt; rig.position.z += (vd.z * -y + vd.x * x) * 3 * dt; } }
+        else if (Math.abs(x) > 0.7 && now > turnAt) { rig.rotation.y -= Math.sign(x) * Math.PI / 6; turnAt = now + 300; }
+      }
+      if (c.userData.held) {
+        wp.setFromMatrixPosition(c.matrixWorld);
+        if (c.userData.last) c.userData.vel.lerp(wp.clone().sub(c.userData.last).divideScalar(dt), 0.5);
+        c.userData.last = wp.clone();
+      }
+    });
+  }
+  function setPlayUI() {
+    $('#icoPlay').classList.toggle('hidden', playing); $('#icoStop').classList.toggle('hidden', !playing);
+    $('#lblPlay').textContent = playing ? 'Stop' : 'Run';
+    const b = $('#btnPlay');
+    b.classList.toggle('bg-emerald-500', !playing); b.classList.toggle('hover:bg-emerald-400', !playing);
+    b.classList.toggle('bg-rose-500', playing); b.classList.toggle('hover:bg-rose-400', playing);
+    $('#modeLbl').textContent = playing ? 'Game' : 'Scene';
+  }
+  function startPlay() {
+    playing = true; clock = 0; snap = objs.map(o => ({ p: [...o.p], r: [...o.r], s: [...o.s] }));
+    objs.forEach(o => { o.v = [0, 0, 0]; o.fn = null; o.gd = undefined; o.gdErr = false; o.held = false; if (o.spawn || o.shape === 'empty') o.mesh.visible = false; });
+    grid.visible = false; if (helper) helper.visible = false; app.dataset.tab = 'scene'; syncTabs(); setPlayUI(); setTimeout(resize, 0);
+  }
+  function stopPlay() {
+    if (!playing) return; playing = false;
+    ctrls.forEach(release);
+    const s = renderer.xr.getSession && renderer.xr.getSession(); if (s) s.end().catch(() => {});
+    objs.forEach((o, i) => { o.p = snap[i].p; o.r = snap[i].r; o.s = snap[i].s; o.v = [0, 0, 0]; o.fn = null; o.mesh.visible = true; sync(o); });
+    rig.position.set(0, 0, 0); rig.rotation.set(0, 0, 0); grid.visible = true; if (helper) helper.visible = true;
+    setPlayUI(); renderInsp(); setTimeout(resize, 0);
+  }
+  $('#btnPlay').onclick = () => playing ? stopPlay() : startPlay();
+  // WebXR entry: keep the request directly inside the button gesture, check support,
+  // and give a useful message when the app is opened inside a non-WebXR Android wrapper.
+  async function enterVR() {
+    const b = $('#btnVR');
+    if (renderer.xr.isPresenting) {
+      const active = renderer.xr.getSession();
+      if (active) { try { await active.end(); } catch (_) {} }
+      return;
+    }
+    if (!window.isSecureContext) {
+      toast('VR needs a secure HTTPS page. Open this editor in Meta Quest Browser using its HTTPS website address.');
+      return;
+    }
+    if (!navigator.xr || typeof navigator.xr.requestSession !== 'function') {
+      toast('This app view does not support WebXR. Open the editor in Meta Quest Browser, not the AppsGeyser preview/webview.');
+      return;
+    }
+    try {
+      if (navigator.xr.isSessionSupported && !(await navigator.xr.isSessionSupported('immersive-vr'))) {
+        toast('Immersive VR is not supported in this browser. Use Meta Quest Browser on your headset.');
+        return;
+      }
+      // Do not await unrelated work before requestSession; browsers require a user gesture.
+      const session = await navigator.xr.requestSession('immersive-vr', {
+        optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking']
+      });
+      await renderer.xr.setSession(session);
+      session.addEventListener('end', () => {
+        if (playing) stopPlay();
+        b.innerHTML = '<svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h18v8a2 2 0 01-2 2h-3.5l-2-3h-3l-2 3H5a2 2 0 01-2-2z"/></svg>Enter VR';
+      }, { once: true });
+      if (!playing) startPlay();
+      const sp = objs.find(o => o.spawn);
+      rig.position.set(sp ? sp.p[0] : 0, sp ? sp.p[1] - sz(sp, 1) / 2 : 0, sp ? sp.p[2] : 0);
+      rig.rotation.set(0, sp ? sp.r[1] * Math.PI / 180 : 0, 0);
+      b.textContent = 'Exit VR';
+    } catch (e) {
+      const msg = e && (e.message || e.name) || 'VR session could not start';
+      toast('Could not enter VR: ' + msg + '. Try opening the HTTPS page directly in Meta Quest Browser.');
+    }
+  }
+  $('#btnVR').addEventListener('click', enterVR);
+
+  /* ---------- Accounts + project storage (this device only) ---------- */
+  const SESSION = 'gang-vr-session', USERS = 'gang-vr-users';
+  let currentUser = null, lastDl = null, idbT;
+  const getUsers = () => { try { return JSON.parse(localStorage.getItem(USERS)) || {}; } catch (e) { return {}; } };
+  const userKey = () => currentUser || '__guest__';
+  const idbOpen = () => new Promise((res, rej) => { const r = indexedDB.open('gang-vr', 1); r.onupgradeneeded = () => r.result.createObjectStore('proj'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+  async function idbPut(k, v) { const db = await idbOpen(); return new Promise((res, rej) => { const tx = db.transaction('proj', 'readwrite'); tx.objectStore('proj').put(v, k); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); }
+  async function idbGet(k) { const db = await idbOpen(); return new Promise((res, rej) => { const r = db.transaction('proj').objectStore('proj').get(k); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+  function idbSchedule() {
+    clearTimeout(idbT);
+    idbT = setTimeout(() => { libPutCurrent().catch(e => log('Could not save project: ' + (e && e.message), 'warn')); }, 800);
+  }
+  async function hashPw(pw, salt) {
+    const data = new TextEncoder().encode(salt + ':' + pw);
+    if (window.crypto && crypto.subtle) { const d = await crypto.subtle.digest('SHA-256', data); return [...new Uint8Array(d)].map(b => b.toString(16).padStart(2, '0')).join(''); }
+    let h = 5381; for (const b of data) h = ((h << 5) + h + b) | 0; return 'x' + (h >>> 0).toString(16);
+  }
+  function setUserBtn() { $('#btnUser').textContent = currentUser ? '👤 ' + currentUser : 'Sign in'; }
+  async function startSession(u) {
+    currentUser = u; KEY = u ? 'gang-vr-scene:' + u : 'gang-vr-scene';
+    const lib = await libGet();
+    const p = lib[localStorage.getItem(CURKEY())] || Object.values(lib).sort((a, b) => b.updated - a.updated)[0] || null;
+    started = true;
+    if (p) {
+      currentId = p.id; project.files = p.files || {}; project.name = p.name || 'project'; project.root = p.root || '';
+      applyScene(p.scene && Array.isArray(p.scene.objs) ? p.scene : { objs: [], uid: 1 });
+      if (!objs.length) { make('ground'); make('spawn'); }
+    } else {
+      try { const d = await idbGet(userKey()); if (d) { project.files = d.files || {}; project.name = d.name || 'project'; project.root = d.root || ''; } } catch (e) {}
+      loadDefault();
+      currentId = 'p' + Date.now().toString(36); try { localStorage.setItem(CURKEY(), currentId); } catch (e) {}
+      libPutCurrent().catch(() => {});
+    }
+    if (objs.length) select(objs.find(o => o.name === 'Table') || objs[0]);
+    renderInsp(); renderList(); setUserBtn(); $('#authModal').style.display = 'none'; resize();
+    toast(u ? 'Signed in as ' + u + '. Your project saves automatically on this device.' : 'Guest mode. Sign in to keep a personal project.');
+  }
+  let authMode = 'in';
+  function showAuth() {
+    $('#authModal').style.display = 'flex'; $('#authErr').textContent = ''; $('#authPass').value = '';
+    setAuthMode(authMode);
+  }
+  function setAuthMode(m) {
+    authMode = m;
+    $('#authTitle').textContent = m === 'in' ? 'Sign in' : 'Create account';
+    $('#authSubmit').textContent = m === 'in' ? 'Sign in' : 'Create account';
+    $('#authSwitch').textContent = m === 'in' ? 'Create an account' : 'I already have an account';
+    $('#authPass').autocomplete = m === 'in' ? 'current-password' : 'new-password';
+    $('#authErr').textContent = '';
+  }
+  async function submitAuth() {
+    const name = $('#authUser').value.trim(), pw = $('#authPass').value, key = name.toLowerCase(), err = $('#authErr');
+    if (name.length < 2) return err.textContent = 'Username must be at least 2 characters.';
+    if (pw.length < 4) return err.textContent = 'Password must be at least 4 characters.';
+    const users = getUsers();
+    if (authMode === 'up') {
+      if (users[key]) return err.textContent = 'That username is taken. Sign in instead.';
+      const salt = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      users[key] = { name, salt, hash: await hashPw(pw, salt) };
+      try { localStorage.setItem(USERS, JSON.stringify(users)); } catch (e) { return err.textContent = 'Could not save account (storage is blocked in this browser).'; }
+    } else {
+      const u = users[key];
+      if (!u || u.hash !== await hashPw(pw, u.salt)) return err.textContent = 'Wrong username or password.';
+    }
+    try { localStorage.setItem(SESSION, key); } catch (e) {}
+    await startSession(key);
+  }
+  $('#authSubmit').onclick = submitAuth;
+  $('#authPass').addEventListener('keydown', e => { if (e.key === 'Enter') submitAuth(); });
+  $('#authSwitch').onclick = () => setAuthMode(authMode === 'in' ? 'up' : 'in');
+  $('#authGuest').onclick = () => startSession(null);
+  $('#btnUser').onclick = () => {
+    if (!currentUser) return showAuth();
+    if (!confirm('Sign out ' + currentUser + '? Your project stays saved on this device.')) return;
+    save(); libPutCurrent().catch(() => {}).finally(() => { try { localStorage.removeItem(SESSION); } catch (e) {} location.reload(); });
+  };
+  async function boot() {
+    const s = localStorage.getItem(SESSION);
+    if (s && getUsers()[s]) await startSession(s); else showAuth();
+  }
+
+  /* ---------- Project library: every project, saved per account ---------- */
+  let currentId = null, started = false;
+  const CURKEY = () => 'gang-vr-current:' + userKey();
+  const libKey = () => userKey() + '|library';
+  async function libGet() { try { return (await idbGet(libKey())) || {}; } catch (e) { return {}; } }
+  async function libPutCurrent() {
+    if (!started) return;
+    if (!currentId) { currentId = 'p' + Date.now().toString(36); try { localStorage.setItem(CURKEY(), currentId); } catch (e) {} }
+    const lib = await libGet();
+    lib[currentId] = { id: currentId, name: project.name || 'Untitled', updated: Date.now(), root: project.root || '', files: project.files, scene: { uid, objs: objs.map(plain) } };
+    await idbPut(libKey(), lib);
+  }
+  function loadProject(p) {
+    if (playing) return toast('Stop the game before switching projects.');
+    currentId = p.id; try { localStorage.setItem(CURKEY(), p.id); } catch (e) {}
+    project.files = p.files || {}; project.name = p.name || 'project'; project.root = p.root || '';
+    applyScene(p.scene && Array.isArray(p.scene.objs) ? p.scene : { objs: [], uid: 1 });
+    if (!objs.length) { make('ground'); make('spawn'); renderList(); save(); }
+    renderInsp(); renderList(); toast('Opened ' + project.name);
+  }
+  async function renderProjects() {
+    const lib = await libGet(), ul = $('#projList'); ul.innerHTML = '';
+    const items = Object.values(lib).sort((a, b) => b.updated - a.updated);
+    if (!items.length) ul.innerHTML = '<li style="color:#9aa4b2;font-size:13px;padding:8px">No projects saved yet.</li>';
+    items.forEach(p => {
+      const cur = p.id === currentId, li = document.createElement('li');
+      li.style.cssText = 'display:flex;align-items:center;gap:8px;border:1px solid ' + (cur ? '#7db9f0' : '#485260') + ';background:#2a323e;border-radius:10px;padding:8px 10px';
+      li.innerHTML = '<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(p.name) + (cur ? ' <span style="color:#7db9f0;font-size:11px">(open)</span>' : '') + '</div><div style="font-size:11px;color:#9aa4b2">' + esc(new Date(p.updated).toLocaleString()) + '</div></div>';
+      if (!cur) {
+        const o = document.createElement('button'); o.textContent = 'Open'; o.style.cssText = 'border-radius:8px;padding:5px 10px;background:#478cbf;color:#fff;font-size:12px';
+        o.onclick = async () => { try { await libPutCurrent(); } catch (e) {} loadProject(p); $('#projModal').style.display = 'none'; };
+        const d = document.createElement('button'); d.textContent = 'Delete'; d.style.cssText = 'border:1px solid #596575;border-radius:8px;padding:5px 10px;background:#303a48;color:#fff;font-size:12px';
+        d.onclick = async () => { if (!confirm('Delete "' + p.name + '"? This cannot be undone.')) return; const l = await libGet(); delete l[p.id]; await idbPut(libKey(), l); renderProjects(); };
+        li.appendChild(o); li.appendChild(d);
+      }
+      ul.appendChild(li);
+    });
+  }
+  async function openProjects() {
+    try { await libPutCurrent(); } catch (e) {}
+    $('#projNote').style.display = 'none'; $('#projModal').style.display = 'flex'; renderProjects();
+  }
+  const b64 = u8 => { let s = ''; const C = 0x8000; for (let i = 0; i < u8.length; i += C) s += String.fromCharCode.apply(null, u8.subarray(i, i + C)); return btoa(s); };
+  const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+  function deliver(blob, filename, text) {
+    const url = URL.createObjectURL(blob), wv = /; wv\)/.test(navigator.userAgent);
+    if (!wv) { try { const a = document.createElement('a'); a.href = url; a.download = filename; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove(); } catch (e) { log('Auto-download failed: ' + e.message, 'warn'); } }
+    const bs = 'border:1px solid #596575;border-radius:9px;padding:7px 12px;background:#303a48;color:#fff;margin:6px 6px 0 0';
+    const box = $('#projNote'); box.style.display = 'block';
+    box.innerHTML = (wv ? 'Downloads are often blocked in app views. ' : 'If nothing downloaded, tap: ') +
+      '<a style="color:#7db9f0;text-decoration:underline" download="' + esc(filename) + '" href="' + url + '">' + esc(filename) + '</a>' +
+      '<div><button id="pnShare" type="button" style="' + bs + '">Share / save</button><button id="pnCopy" type="button" style="' + bs + '">Copy as text</button><button id="pnHelp" type="button" style="' + bs + '">Not working? Help</button><button id="pnOpen" type="button" style="' + bs + '">Open in new tab</button></div>';
+    $('#pnShare').onclick = async () => {
+      try { const f = new File([blob], filename, { type: 'application/json' }); if (navigator.canShare && navigator.canShare({ files: [f] })) await navigator.share({ files: [f], title: filename }); else toast('Sharing files is not supported here.'); }
+      catch (e) { if (e.name !== 'AbortError') toast('Share failed: ' + e.message); }
+    };
+    $('#pnCopy').onclick = async () => { try { await navigator.clipboard.writeText(text); toast('Copied. Paste it into a notes app, then use "Load from pasted text" later.'); } catch (e) { toast('Could not copy automatically on this device.'); } };
+    $('#pnHelp').onclick = showDlHelp;
+    $('#pnOpen').onclick = () => { const w = window.open(url, '_blank'); if (!w) toast('The browser blocked the new tab. Allow pop-ups for this site.'); };
+    lastDl = 'projects';
+    toast(wv ? 'Tap the link to save projects.json' : 'Download started for ' + filename);
+    if (wv) setTimeout(showDlHelp, 600);
+  }
+  async function exportProjects() {
+    try {
+      await libPutCurrent();
+      const lib = await libGet();
+      const out = {
+        gangVrProjects: 1, exportedAt: new Date().toISOString(), user: currentUser || 'guest',
+        projects: Object.values(lib).map(p => ({
+          id: p.id, name: p.name, updated: p.updated, root: p.root, scene: p.scene,
+          files: Object.fromEntries(Object.entries(p.files || {}).map(([k, v]) => [k, v instanceof Uint8Array ? { b: b64(v) } : { t: String(v) }]))
+        }))
+      };
+      const text = JSON.stringify(out);
+      deliver(new Blob([text], { type: 'application/json' }), 'projects.json', text);
+    } catch (e) { toast('Could not build projects file: ' + (e.message || e)); }
+  }
+  async function importProjects(text) {
+    const d = JSON.parse(text);
+    if (!d || d.gangVrProjects !== 1 || !Array.isArray(d.projects)) throw new Error('This is not a projects file.');
+    try { await libPutCurrent(); } catch (e) {}
+    const lib = await libGet(); let n = 0;
+    d.projects.forEach(p => {
+      let id = p.id || ('p' + Date.now().toString(36) + n), name = p.name || 'Imported project';
+      if (id === currentId) { id = 'p' + Date.now().toString(36) + 'i' + n; name += ' (imported)'; }
+      lib[id] = { id, name, updated: p.updated || Date.now(), root: p.root || '', scene: p.scene || { uid: 1, objs: [] },
+        files: Object.fromEntries(Object.entries(p.files || {}).map(([k, v]) => [k, v.t !== undefined ? v.t : unb64(v.b)])) };
+      n++;
+    });
+    await idbPut(libKey(), lib);
+    toast('Loaded ' + n + ' project' + (n === 1 ? '' : 's') + '. Tap Open to use one.');
+    if ($('#projModal').style.display === 'flex') renderProjects(); else openProjects();
+  }
+  $('#myProjectsBtn').onclick = openProjects;
+  $('#projClose').onclick = () => { $('#projModal').style.display = 'none'; };
+  $('#projExport').onclick = exportProjects;
+  $('#exportAllBtn').onclick = () => { $('#exportModal').classList.remove('open'); openProjects().then(exportProjects); };
+  $('#projImport').onclick = () => $('#projFileIn').click();
+  $('#projFileIn').onchange = async e => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    try { await importProjects(await f.text()); } catch (err) { toast(err.message || 'Could not read that file'); }
+  };
+
+  /* downloads blocked help */
+  const openInChrome = () => { location.href = 'intent://' + location.host + location.pathname + location.search + '#Intent;scheme=' + location.protocol.replace(':', '') + ';package=com.android.chrome;end'; };
+  const showDlHelp = () => { $('#dlHelp').style.display = 'flex'; $('#dlChrome').style.display = /^https?:$/.test(location.protocol) ? '' : 'none'; };
+  $('#dlClose').onclick = () => { $('#dlHelp').style.display = 'none'; };
+  $('#dlDiag').onclick = () => {
+    let blobOk = false; try { blobOk = !!URL.createObjectURL(new Blob(['x'])); } catch (e) {}
+    const lines = [
+      'Page: ' + location.protocol + '//' + (location.host || '(local file)'),
+      'Secure context (HTTPS): ' + window.isSecureContext,
+      'App WebView: ' + /; wv\)/.test(navigator.userAgent),
+      'Quest Browser: ' + /OculusBrowser|Quest/i.test(navigator.userAgent),
+      'Download attribute supported: ' + ('download' in HTMLAnchorElement.prototype),
+      'Blob links work: ' + blobOk,
+      'File sharing supported: ' + !!navigator.canShare,
+      'Notifications: ' + ('Notification' in window ? Notification.permission : 'unsupported'),
+      'Inside a frame: ' + (window.self !== window.top),
+      'Agent: ' + navigator.userAgent
+    ];
+    let pre = $('#dlDiagOut');
+    if (!pre) { pre = document.createElement('pre'); pre.id = 'dlDiagOut'; pre.style.cssText = 'font-size:11px;color:#d5dce5;background:#171c23;border-radius:8px;padding:8px;margin-top:10px;white-space:pre-wrap;word-break:break-all'; $('#dlHelp').firstElementChild.appendChild(pre); }
+    pre.textContent = lines.join('\n');
+  };
+  $('#dlChrome').onclick = openInChrome;
+  $('#dlRetry').onclick = () => { $('#dlHelp').style.display = 'none'; if (lastDl === 'projects') exportProjects(); else if (lastDl) downloadZip(lastDl[0], lastDl[1]); };
+  $('#dlNotify').onclick = async () => {
+    if (!('Notification' in window)) return toast('Notifications are not supported here. Use the steps listed.');
+    try {
+      const r = await Notification.requestPermission();
+      if (r === 'granted') { toast('Notifications are on.'); try { new Notification('Gang VR Engine', { body: 'Notifications enabled.' }); } catch (_) {} }
+      else toast('Notifications are blocked. Turn them on in your browser site settings.');
+    } catch (e) { toast('Could not ask for notifications: ' + e.message); }
+  };
+
+  /* ---------- UI wiring ---------- */
+  $('#btnAdd').onclick = e => { e.stopPropagation(); $('#menuAdd').classList.toggle('hidden'); };
+  document.addEventListener('click', () => $('#menuAdd').classList.add('hidden'));
+  document.querySelectorAll('[data-add]').forEach(b => b.onclick = () => { if (playing) return; setSeg('scene'); select(make(b.dataset.add, [tgt.x, 0, tgt.z])); save(); });
+  $('#search').oninput = () => $('#files').style.display === 'none' ? renderList() : renderFiles();
+  let exportTarget = 'quest';
+  const targetNotes = {
+    quest: 'A browser page cannot compile a native APK, so this exports an editable project ZIP. To get a Quest-installable APK from this WebXR app: host this page over HTTPS (GitHub Pages or Netlify), add a manifest.json and service worker, then run the URL through pwabuilder.com to generate an Android package. Or simply open the hosted URL in Meta Quest Browser and tap Enter VR.',
+    android: 'Android APK needs an Android build pipeline (Gradle/Android Studio or a cloud builder). The ZIP contains project data for a compatible builder; it is not itself an APK.',
+    aab: 'AAB requires a native Android build pipeline and signing configuration. The editor can prepare project data but cannot produce a signed AAB directly.',
+    webxr: 'WebXR can run in a compatible headset browser when hosted over HTTPS. Download the web package and host it on an HTTPS site.',
+    html5: 'The current editor is a 3D scene editor, not a complete standalone game runtime exporter. The web package includes your project data and editor source.',
+    windows: 'Windows EXE requires a desktop build pipeline. Download the editable project ZIP and build it with a compatible engine/toolchain.',
+    pcvr: 'PC VR requires a desktop runtime and OpenXR-compatible build pipeline. The editable ZIP is a project handoff, not a compiled executable.',
+    linux: 'Linux builds require a compatible desktop build pipeline. The editable ZIP is a project handoff, not a compiled executable.',
+    macos: 'macOS builds require a compatible macOS build pipeline and signing as needed. The editable ZIP is a project handoff, not a compiled app.',
+    project: 'This exports the editable project data and imported files as a ZIP.'
+  };
+  function chooseExport(target) {
+    exportTarget = target;
+    document.querySelectorAll('#exportTargets .target').forEach(b => b.classList.toggle('active', b.dataset.target === target));
+    $('#exportNote').textContent = targetNotes[target] || targetNotes.project;
+    $('#downloadWebPackage').style.display = ['webxr','html5'].includes(target) ? '' : 'none';
+  }
+  $('#btnExport').title = 'Open Export Center';
+  $('#btnExport').onclick = () => { $('#exportModal').classList.add('open'); chooseExport('quest'); };
+  $('#closeExport').onclick = $('#cancelExport').onclick = () => $('#exportModal').classList.remove('open');
+  $('#exportModal').addEventListener('click', e => { if (e.target === $('#exportModal')) $('#exportModal').classList.remove('open'); });
+  document.querySelectorAll('#exportTargets .target').forEach(b => b.onclick = () => chooseExport(b.dataset.target));
+  function snapshotScene() {
+    project.files['scene.json'] = JSON.stringify({ uid, objs: objs.map(plain) }, null, 2);
+    project.files['project-info.json'] = JSON.stringify({
+      name: project.name || 'NoahEngienProject',
+      engine: 'Noah Engien / Gang VR Engine',
+      selectedExportTarget: exportTarget,
+      exportedAt: new Date().toISOString(),
+      note: 'This is project data. Native APK/EXE/AAB compilation requires a compatible build pipeline.'
+    }, null, 2);
+  }
+  async function downloadZip(filename, webPackage) {
+    if (!window.JSZip) return toast('ZIP library did not load. Check your internet connection and retry.');
+    try {
+      snapshotScene();
+      const z = new JSZip();
+      if (webPackage) {
+        z.file('index.html', '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + esc(project.name || 'Game') + '</title></head><body style="font-family:system-ui;background:#171c23;color:#fff;padding:24px"><h1>' + esc(project.name || 'Game') + '</h1><p>This web package contains the Noah Engien project data. It must be connected to a runtime to play as a standalone game.</p><p>See README.txt and scene.json.</p></body></html>');
+      }
+      Object.entries(project.files).forEach(([p, d]) => {
+        if (d instanceof Uint8Array) z.file(p, d);
+        else z.file(p, String(d));
+      });
+      z.file('README.txt', [
+        'NOAH ENGIEN PROJECT EXPORT',
+        'Project: ' + (project.name || 'Untitled Project'),
+        'Target selected: ' + exportTarget,
+        '',
+        'This ZIP is an editable project handoff, not a compiled APK/EXE/AAB.',
+        'Meta Quest requires a native Android ARM64 VR build with OpenXR/Meta XR support.',
+        'Android APK/AAB and desktop binaries must be compiled with a compatible build pipeline.',
+        'scene.json contains the editable scene objects and transforms.',
+        'project-info.json contains export metadata.'
+      ].join('\n'));
+
+      // STORE = no compression, much lower memory use (the usual cause of crashes with big imports)
+      const blob = await z.generateAsync({ type: 'blob', compression: 'STORE', streamFiles: true });
+      const url = URL.createObjectURL(blob);
+      const wv = /; wv\)/.test(navigator.userAgent); // Android WebView
+
+      // Auto-download only in a real browser. WebViews can crash or blank out on blob downloads.
+      if (!wv) {
+        try {
+          const a = document.createElement('a');
+          a.href = url; a.download = filename; a.rel = 'noopener';
+          document.body.appendChild(a); a.click(); a.remove();
+        } catch (e) { log('Auto-download failed: ' + e.message, 'warn'); }
+      }
+
+      // Always show a manual link + an optional Share button (share needs its own tap)
+      const note = $('#exportNote');
+      note.innerHTML = (wv ? 'This looks like an app WebView, which often blocks downloads. For a reliable download, open this page in Chrome or Meta Quest Browser. ' : 'If nothing downloaded, tap: ') +
+        '<a style="color:#7db9f0;text-decoration:underline" download="' + esc(filename) + '" href="' + url + '">' + esc(filename) + '</a>' +
+        '<div style="margin-top:8px"><button id="shareZip" type="button" style="border:1px solid #596575;border-radius:9px;padding:7px 12px;background:#303a48;color:#fff">Share / save via share sheet</button></div>';
+      $('#shareZip').onclick = async () => {
+        try {
+          const file = new File([blob], filename, { type: 'application/zip' });
+          if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: filename });
+          else toast('Sharing files is not supported here.');
+        } catch (e) { if (e.name !== 'AbortError') toast('Share failed: ' + e.message); }
+      };
+      // Extra fallbacks for wrappers that silently block downloads
+      const bs = 'border:1px solid #596575;border-radius:9px;padding:7px 12px;background:#303a48;color:#fff;margin:6px 6px 0 0';
+      const httpPage = /^https?:$/.test(location.protocol);
+      note.insertAdjacentHTML('beforeend',
+        '<div style="margin-top:4px">' +
+        (httpPage ? '<button id="openChrome" type="button" style="' + bs + '">Open this page in Chrome</button>' : '') +
+        '<button id="dataDl" type="button" style="' + bs + '">Try alternate download</button>' +
+        '<button id="copyScene" type="button" style="' + bs + '">Copy scene JSON</button>' +
+        '</div><textarea id="sceneOut" readonly style="display:none;height:120px;margin-top:8px"></textarea>');
+      if (httpPage) $('#openChrome').onclick = () => {
+        location.href = 'intent://' + location.host + location.pathname + location.search + '#Intent;scheme=' + location.protocol.replace(':', '') + ';package=com.android.chrome;end';
+      };
+      $('#dataDl').onclick = async () => {
+        try {
+          toast('Preparing alternate download...');
+          const b64 = await z.generateAsync({ type: 'base64', compression: 'STORE' });
+          const a = document.createElement('a');
+          a.href = 'data:application/zip;base64,' + b64; a.download = filename;
+          document.body.appendChild(a); a.click(); a.remove();
+        } catch (e) { toast('Alternate download failed: ' + e.message); }
+      };
+      $('#copyScene').onclick = async () => {
+        const txt = project.files['scene.json'] || '';
+        const ta = $('#sceneOut'); ta.value = txt; ta.style.display = 'block';
+        try { await navigator.clipboard.writeText(txt); toast('Scene JSON copied. Paste it into a notes app to keep it.'); }
+        catch (e) { ta.focus(); ta.select(); try { document.execCommand('copy'); toast('Scene JSON copied.'); } catch (_) { toast('Press and hold the text box to copy it.'); } }
+      };
+      lastDl = [filename, webPackage];
+      note.insertAdjacentHTML('beforeend', '<div style="margin-top:10px;padding-top:8px;border-top:1px solid #2f3743">Did the download start? <button id="dlYes" type="button" style="' + bs + '">Yes</button><button id="dlNo" type="button" style="' + bs + '">No, help me</button></div>');
+      $('#dlYes').onclick = () => { toast('Great. Your project is downloaded.'); };
+      $('#dlNo').onclick = showDlHelp;
+      toast(wv ? 'ZIP ready. Tap the link in the export dialog.' : 'Download started for ' + filename);
+      if (wv) setTimeout(showDlHelp, 600);
+    } catch (e) { toast('Export failed: ' + (e.message || 'unknown error')); }
+  }
+  /* Backup without downloads: copy the scene as text, paste it back later */
+  const projText = $('#projText'), projLoad = $('#projLoad');
+  $('#copyProject').onclick = async () => {
+    const txt = JSON.stringify({ gangVrProject: 1, name: project.name, uid, objs: objs.map(plain) });
+    projText.style.display = 'block'; projLoad.style.display = 'none'; projText.readOnly = true; projText.value = txt;
+    try { await navigator.clipboard.writeText(txt); toast('Project copied. Paste it into a notes app to keep it.'); }
+    catch (e) { projText.focus(); projText.select(); try { document.execCommand('copy'); toast('Project copied.'); } catch (_) { toast('Press and hold the text box, then choose Copy.'); } }
+  };
+  $('#pasteProject').onclick = () => {
+    projText.style.display = 'block'; projLoad.style.display = ''; projText.readOnly = false; projText.value = ''; projText.focus();
+    toast('Paste your project text, then tap Load.');
+  };
+  projLoad.onclick = () => {
+    try {
+      const d = JSON.parse(projText.value);
+      if (d && d.gangVrProjects) { importProjects(projText.value).then(() => { $('#exportModal').classList.remove('open'); }).catch(e => toast(e.message)); return; }
+      if (!d || !Array.isArray(d.objs)) throw new Error('missing objects');
+      if (d.name) project.name = d.name;
+      applyScene(d); toast('Project loaded.'); $('#exportModal').classList.remove('open');
+    } catch (e) { toast('That text is not a valid project: ' + e.message); }
+  };
+  $('#downloadProjectZip').onclick = () => downloadZip((project.name || 'Noah-Engien') + '-' + exportTarget + '-project.zip', false);
+  $('#downloadWebPackage').onclick = () => downloadZip((project.name || 'Noah-Engien') + '-' + exportTarget + '-web-package.zip', true);
+  function syncTabs() { document.querySelectorAll('nav [data-tab]').forEach(b => b.classList.toggle('tab-on', b.dataset.tab === app.dataset.tab)); }
+  document.querySelectorAll('nav [data-tab]').forEach(b => b.onclick = () => { app.dataset.tab = b.dataset.tab; syncTabs(); setTimeout(resize, 0); });
+  function switchTab(tab) { app.dataset.tab = tab; syncTabs(); setTimeout(resize, 30); }
+  $('#newProjectBtn').onclick = async () => {
+    if (!confirm('Start a new project? Your current one stays saved in My Projects.')) return;
+    try { await libPutCurrent(); } catch (e) {}
+    currentId = 'p' + Date.now().toString(36); try { localStorage.setItem(CURKEY(), currentId); } catch (e) {}
+    objs.forEach(o => scene.remove(o.mesh)); objs = []; project.files = {}; project.name = 'Untitled Project'; project.root = '';
+    localStorage.removeItem(KEY); uid = 1; sel = null; helper && scene.remove(helper); helper = null;
+    make('ground'); make('spawn'); make('cube'); renderList(); renderInsp(); save(); switchTab('hier'); toast('New project created');
+  };
+  $('#renameProjectBtn').onclick = () => {
+    const n = prompt('Project name:', project.name || 'Untitled Project');
+    if (n && n.trim()) { project.name = n.trim().replace(/[\\\\/:*?"<>|]/g, '-').slice(0, 80); idbSchedule(); toast('Project renamed to ' + project.name); }
+  };
+  $('#saveProjectBtn').onclick = async () => {
+    save();
+    if (window.JSZip) await downloadZip((project.name || 'Noah-Engien') + '-project.zip', false);
+    else toast('Scene saved on this device. ZIP export needs the ZIP library to load.');
+  };
+  function resize() {
+    if (renderer.xr.isPresenting) return;
+    const w = wrap.clientWidth, h = wrap.clientHeight; if (!w || !h) return;
+    renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+  }
+  addEventListener('resize', () => { syncTabs(); resize(); }); new ResizeObserver(resize).observe(wrap);
+
+  renderer.setAnimationLoop(t => {
+    const dt = Math.min(0.05, (t - last) / 1000 || 0.016); last = t;
+    if (playing) step(dt);
+    if (helper && !playing) helper.update();
+    if (!renderer.xr.isPresenting) placeCam();
+    renderer.render(scene, camera);
+  });
+
+  syncTabs(); resize(); boot();
+})();
+</script>
+</body>
+</html>
